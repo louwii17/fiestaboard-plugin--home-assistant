@@ -1,10 +1,15 @@
 """Tests for the home_assistant plugin."""
 
+import json
+from pathlib import Path
+
 import pytest
 from unittest.mock import patch, Mock, MagicMock
 
 from plugins.home_assistant import HomeAssistantPlugin
 from src.plugins.base import PluginResult
+
+MANIFEST_PATH = Path(__file__).resolve().parent.parent / "manifest.json"
 
 
 def _ha_manifest():
@@ -17,7 +22,6 @@ def _ha_manifest():
         "author": "Test",
         "settings_schema": {},
         "variables": {},
-        "max_lengths": {},
     }
 
 
@@ -857,4 +861,69 @@ class TestHomeAssistantDisplay:
         """Test Plugin export is correctly set."""
         from plugins.home_assistant import Plugin
         assert Plugin is HomeAssistantPlugin
+
+
+class TestManifestMetadata:
+    """Tests for rich variable metadata in manifest.json."""
+
+    @pytest.fixture(autouse=True)
+    def load_manifest(self):
+        with open(MANIFEST_PATH) as f:
+            self.manifest = json.load(f)
+
+    def test_required_top_level_fields(self):
+        for field in ("id", "name", "version", "description", "variables"):
+            assert field in self.manifest, f"Missing required field: {field}"
+
+    def test_simple_variables_are_dicts(self):
+        simple = self.manifest["variables"]["simple"]
+        assert isinstance(simple, dict), "variables.simple must be a dict, not a list"
+        for key, meta in simple.items():
+            assert isinstance(meta, dict), f"variables.simple.{key} must be a dict"
+
+    def test_simple_variables_have_required_keys(self):
+        simple = self.manifest["variables"]["simple"]
+        required_keys = {"description", "type", "max_length"}
+        for key, meta in simple.items():
+            missing = required_keys - meta.keys()
+            assert not missing, f"variables.simple.{key} missing keys: {missing}"
+
+    def test_simple_variables_have_example(self):
+        simple = self.manifest["variables"]["simple"]
+        for key, meta in simple.items():
+            assert "example" in meta, f"variables.simple.{key} missing 'example'"
+
+    def test_groups_defined(self):
+        groups = self.manifest["variables"].get("groups", {})
+        assert len(groups) > 0, "variables.groups must define at least one group"
+        for gid, gdef in groups.items():
+            assert "label" in gdef, f"Group '{gid}' missing 'label'"
+
+    def test_simple_variable_groups_reference_valid_groups(self):
+        groups = set(self.manifest["variables"].get("groups", {}).keys())
+        simple = self.manifest["variables"]["simple"]
+        for key, meta in simple.items():
+            if "group" in meta:
+                assert meta["group"] in groups, (
+                    f"variables.simple.{key} references unknown group '{meta['group']}'"
+                )
+
+    def test_dynamic_entities_preserved(self):
+        dyn = self.manifest["variables"].get("dynamic_entities")
+        assert dyn is not None, "dynamic_entities section must be present"
+        assert "access_pattern" in dyn
+        assert "examples" in dyn and len(dyn["examples"]) > 0
+
+    def test_no_top_level_max_lengths(self):
+        assert "max_lengths" not in self.manifest, (
+            "max_lengths must be embedded in variables.simple, not top-level"
+        )
+
+    def test_max_length_values_are_positive_ints(self):
+        simple = self.manifest["variables"]["simple"]
+        for key, meta in simple.items():
+            ml = meta.get("max_length")
+            assert isinstance(ml, int) and ml > 0, (
+                f"variables.simple.{key}.max_length must be a positive int"
+            )
 
