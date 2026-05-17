@@ -1,7 +1,7 @@
 {
   "id": "home_assistant",
   "name": "Home Assistant",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Display entity states from Home Assistant via REST API or MQTT Statestream",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--home-assistant",
@@ -26,7 +26,7 @@
       "access_token": {
         "type": "string",
         "title": "Long-Lived Access Token",
-        "description": "Create in HA: Profile → Long-Lived Access Tokens",
+        "description": "Create in HA: Profile \u2192 Long-Lived Access Tokens",
         "ui:widget": "password"
       },
       "entities": {
@@ -194,41 +194,64 @@
     }
   ],
   "demo": {
-    "name": "Home Assistant Demo",
-    "device_type": "flagship",
-    "template": [
-      "Home Assistant",
-      "",
-      "Connected {{home_assistant.connected}}",
-      "Entities {{home_assistant.entity_count}}",
-      "Via {{home_assistant.data_source}}",
-      ""
-    ],
-    "line_metadata": [
-      {
-        "alignment": "center",
-        "wrap": false
-      },
-      {
-        "alignment": "center",
-        "wrap": false
-      },
-      {
-        "alignment": "center",
-        "wrap": false
-      },
-      {
-        "alignment": "center",
-        "wrap": false
-      },
-      {
-        "alignment": "center",
-        "wrap": false
-      },
-      {
-        "alignment": "center",
-        "wrap": false
-      }
-    ]
+    "flagship": {
+      "name": "Home Assistant Demo",
+      "template": [
+        "Home Assistant",
+        "",
+        "Connected {{home_assistant.connected}}",
+        "Entities {{home_assistant.entity_count}}",
+        "Via {{home_assistant.data_source}}",
+        ""
+      ],
+      "line_metadata": [
+        {
+          "alignment": "center",
+          "wrap": false
+        },
+        {
+          "alignment": "center",
+          "wrap": false
+        },
+        {
+          "alignment": "center",
+          "wrap": false
+        },
+        {
+          "alignment": "center",
+          "wrap": false
+        },
+        {
+          "alignment": "center",
+          "wrap": false
+        },
+        {
+          "alignment": "center",
+          "wrap": false
+        }
+      ]
+    },
+    "note": {
+      "name": "Home Assistant (Note)",
+      "template": [
+        "HOME ASSISTANT",
+        "{{home_assistant.entity_count}} ENTITIES",
+        "{{home_assistant.data_source}}"
+      ],
+      "line_metadata": [
+        {
+          "alignment": "left",
+          "wrap": false
+        },
+        {
+          "alignment": "left",
+          "wrap": false
+        },
+        {
+          "alignment": "left",
+          "wrap": false
+        }
+      ]
+    }
   }
 }
