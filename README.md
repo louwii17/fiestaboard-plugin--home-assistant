@@ -2,7 +2,8 @@
 
 ![Home Assistant Display](./docs/board-display.png)
 
-Display entity states from your Home Assistant instance.
+Display entity states from your Home Assistant instance and use generic entity
+rules to temporarily override lower-priority FiestaBoard pages.
 
 **→ [Setup Guide](./docs/SETUP.md)** - Access token setup and configuration
 
@@ -26,6 +27,9 @@ The Home Assistant plugin connects to your Home Assistant instance and allows yo
 - Configurable entity list
 - **MQTT Statestream mode** — real-time entity updates with zero polling
 - Automatic REST fallback when MQTT is unavailable
+- Priority-based page triggers for any entity state or attribute
+- Persistent conditions and one-shot change/change-to rules
+- Automatic return to another active trigger or the normal FiestaBoard schedule
 
 ## Quick Setup
 
@@ -55,6 +59,22 @@ Set `base_url` and `access_token` in the plugin configuration.
 {{home_assistant.connected}}      # "Yes" or connection status
 {{home_assistant.entity_count}}   # Number of entities
 {{home_assistant.data_source}}    # "rest" or "mqtt_statestream"
+```
+
+When a page is rendered by a trigger, it also receives:
+
+```text
+{{home_assistant.trigger_rule_id}}
+{{home_assistant.trigger_name}}
+{{home_assistant.trigger_page_id}}
+{{home_assistant.trigger_priority}}
+{{home_assistant.trigger_duration_seconds}}
+{{home_assistant.trigger_entity_id}}
+{{home_assistant.trigger_field}}
+{{home_assistant.trigger_operator}}
+{{home_assistant.trigger_expected}}
+{{home_assistant.trigger_actual}}
+{{home_assistant.trigger_previous}}
 ```
 
 ### Dynamic Entity Access
@@ -119,6 +139,7 @@ Windows: {{home_assistant.binary_sensor.windows.state}}
 | entities | array | No | Specific entities to monitor |
 | timeout | integer | No | Request timeout (default: 5) |
 | refresh_seconds | integer | No | Update interval (default: 30) |
+| trigger_rules | array | No | Generic entity state or attribute trigger rules |
 | mqtt_statestream | boolean | No | Enable MQTT Statestream mode (default: false) |
 | statestream_base_topic | string | No | MQTT topic prefix (default: homeassistant/statestream) |
 | statestream_broker_host | string | No | Override MQTT broker host (defaults to MQTT_BROKER_HOST) |
@@ -136,6 +157,57 @@ Configure specific entities with friendly names:
   ]
 }
 ```
+
+### Priority page triggers
+
+Add one or more rules. Each rule has its own stable ID, Home Assistant entity
+condition, FiestaBoard template page, priority, and trigger lease. Priorities
+are compared with every other active FiestaBoard plugin trigger; higher values
+win. Rules default to Ambient priority 10, so users must explicitly raise a
+rule that should interrupt notable content such as MLB Scores at priority 50.
+
+```json
+{
+  "refresh_seconds": 10,
+  "trigger_rules": [
+    {
+      "id": "now_playing",
+      "enabled": true,
+      "name": "Now playing",
+      "entity_id": "media_player.home",
+      "page_id": "page-now-playing",
+      "field": "state",
+      "operator": "equals",
+      "value": "playing",
+      "priority": 60,
+      "duration_seconds": 45
+    }
+  ]
+}
+```
+
+While the condition is true, the plugin renews the priority-60 trigger. After
+the last matching check, FiestaBoard keeps it for `duration_seconds`, then
+shows the next-highest active trigger. A live MLB trigger therefore resumes
+automatically; when no other trigger is active, FiestaBoard resumes its current
+schedule or manual page.
+
+Recommended priority tiers are Ambient 10, Notable 50, Urgent 80, and Critical
+100. MLB Scores uses 50, so a Now Playing rule at 60 appears above sports while
+music is playing. Leave ordinary informational rules at the default 10.
+
+Available comparisons are `equals`, `not_equals`, `contains`, `not_contains`,
+`one_of`, numeric greater/less comparisons, `exists`, `not_exists`, `changes`,
+and `changes_to`. `one_of` accepts comma-separated values. `changes` and
+`changes_to` do not fire during the first observation after startup or a
+configuration change; they fire on a subsequent transition.
+
+Use `field: state` for the normal entity state. Set `field` to an attribute
+name such as `temperature`, or a dot-separated path such as
+`forecast.temperature`, to evaluate attributes. Keep `duration_seconds` longer
+than FiestaBoard's page polling interval to prevent a persistent trigger from
+expiring between checks. Rule IDs must be unique and remain stable; reordering
+the rules does not change their trigger identity or dismissal behavior.
 
 ## Entity States
 
@@ -193,4 +265,3 @@ You can apply colors based on entity states:
 ## Author
 
 FiestaBoard Team
-

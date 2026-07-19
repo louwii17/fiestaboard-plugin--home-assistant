@@ -11,11 +11,15 @@ Supports two data modes:
    to REST polling if the MQTT connection is lost.
 """
 
-from typing import Any, Dict, List, Optional
 import logging
+import re
+from typing import Any, Dict, List, Optional
+
 import requests
 
-from src.plugins.base import PluginBase, PluginResult
+from src.plugins.base import PluginBase, PluginResult, TriggerResult
+
+from .trigger_rules import MISSING, OPERATORS, OPERATORS_WITHOUT_VALUE, display_value, resolve_field, rule_matches
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +33,7 @@ class HomeAssistantPlugin(PluginBase):
     
     def __init__(self, manifest: Dict[str, Any]):
         """Initialize the home assistant plugin."""
+        self._rule_values: Dict[str, object] = {}
         super().__init__(manifest)
         self._cache: Optional[Dict[str, Any]] = None
         self._all_entities: Optional[Dict[str, Dict]] = None
@@ -48,7 +53,53 @@ class HomeAssistantPlugin(PluginBase):
                 errors.append("Home Assistant URL is required")
             if not config.get("access_token"):
                 errors.append("Access token is required")
+
+        rules = config.get("trigger_rules", [])
+        if not isinstance(rules, list):
+            errors.append("Trigger rules must be a list")
+            return errors
+        rule_ids: List[str] = []
+        for index, rule in enumerate(rules, start=1):
+            errors.extend(self._validate_trigger_rule(rule, index))
+            if isinstance(rule, dict) and rule.get("id"):
+                rule_ids.append(str(rule["id"]))
+        duplicate_ids = sorted({rule_id for rule_id in rule_ids if rule_ids.count(rule_id) > 1})
+        if duplicate_ids:
+            errors.append(f"Trigger rule IDs must be unique: {', '.join(duplicate_ids)}")
         
+        return errors
+
+    @staticmethod
+    def _validate_trigger_rule(rule: object, index: int) -> List[str]:
+        """Validate one generic entity trigger rule."""
+        prefix = f"Trigger rule {index}"
+        if not isinstance(rule, dict):
+            return [f"{prefix} must be an object"]
+        rule_id = str(rule.get("id") or "")
+        if not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", rule_id):
+            return [f"{prefix} requires a stable lowercase rule ID"]
+        if not rule.get("entity_id"):
+            return [f"{prefix} requires an entity ID"]
+        if rule.get("enabled", True) and not rule.get("page_id"):
+            return [f"{prefix} requires a FiestaBoard page"]
+        errors: List[str] = []
+        operator = str(rule.get("operator", "equals"))
+        if operator not in OPERATORS:
+            errors.append(f"{prefix} has an unsupported operator")
+        if operator not in OPERATORS_WITHOUT_VALUE and str(rule.get("value", "")) == "":
+            errors.append(f"{prefix} requires a comparison value")
+        try:
+            priority = int(rule.get("priority", 10))
+            if not 1 <= priority <= 100:
+                errors.append(f"{prefix} priority must be between 1 and 100")
+        except (TypeError, ValueError):
+            errors.append(f"{prefix} priority must be a number")
+        try:
+            duration = int(rule.get("duration_seconds", 45))
+            if not 10 <= duration <= 900:
+                errors.append(f"{prefix} duration must be between 10 and 900 seconds")
+        except (TypeError, ValueError):
+            errors.append(f"{prefix} duration must be a number")
         return errors
     
     # ------------------------------------------------------------------
@@ -335,11 +386,106 @@ class HomeAssistantPlugin(PluginBase):
         return lines[:6]
 
     # ------------------------------------------------------------------
+    # Generic page triggers
+    # ------------------------------------------------------------------
+
+    def check_triggers(self) -> List[TriggerResult]:
+        """Evaluate configured entity rules and emit rendered page triggers."""
+        result = self._get_trigger_data()
+        if not result.available or not result.data:
+            return []
+
+        triggers: List[TriggerResult] = []
+        for rule in self.config.get("trigger_rules", []):
+            if not isinstance(rule, dict) or not rule.get("enabled", True):
+                continue
+            entity_id = str(rule.get("entity_id") or "").strip()
+            if not entity_id:
+                continue
+            field = str(rule.get("field") or "state").strip()
+            rule_key = str(rule.get("id") or "")
+            if not rule_key:
+                continue
+            entity = result.data.get(entity_id, MISSING)
+            actual = resolve_field(entity, field)
+            previous = self._rule_values.get(rule_key, MISSING)
+            matched = rule_matches(
+                str(rule.get("operator", "equals")),
+                actual,
+                rule.get("value", ""),
+                previous=previous,
+                case_sensitive=bool(rule.get("case_sensitive", False)),
+            )
+            self._rule_values[rule_key] = actual
+            if not matched:
+                continue
+
+            trigger_data = dict(result.data)
+            trigger_data.update(
+                {
+                    "trigger_active": True,
+                    "trigger_rule_id": rule_key,
+                    "trigger_name": str(rule.get("name") or entity_id),
+                    "trigger_page_id": str(rule.get("page_id") or ""),
+                    "trigger_priority": int(rule.get("priority", 10)),
+                    "trigger_duration_seconds": int(rule.get("duration_seconds", 45)),
+                    "trigger_entity_id": entity_id,
+                    "trigger_field": field,
+                    "trigger_operator": str(rule.get("operator", "equals")),
+                    "trigger_expected": display_value(rule.get("value", "")),
+                    "trigger_actual": display_value(actual),
+                    "trigger_previous": display_value(previous),
+                }
+            )
+            formatted_lines = self._render_trigger_page(str(rule.get("page_id") or ""), trigger_data)
+            if not formatted_lines:
+                continue
+            triggers.append(
+                TriggerResult(
+                    triggered=True,
+                    trigger_id=f"home_assistant:{rule_key}",
+                    priority=int(rule.get("priority", 10)),
+                    duration_seconds=int(rule.get("duration_seconds", 45)),
+                    data=trigger_data,
+                    formatted_lines=formatted_lines,
+                )
+            )
+        return triggers
+
+    def _get_trigger_data(self) -> PluginResult:
+        """Bypass FiestaBoard's data cache when MQTT already has fresher state."""
+        if self.config.get("mqtt_statestream", False) and self._ensure_mqtt_listener():
+            return self._build_result_from_mqtt()
+        return self.get_data()
+
+    def _render_trigger_page(self, page_id: str, data: Dict[str, Any]) -> List[str] | None:
+        """Render a rule's selected template page with Home Assistant context."""
+        if not page_id:
+            return None
+        try:
+            from src.pages.service import get_page_service
+
+            page_service = get_page_service()
+            page = page_service.get_page(page_id)
+            if page is None or page.type != "template":
+                logger.warning("Home Assistant trigger page is missing or not a template: %s", page_id)
+                return None
+            result = page_service.render_page(page, context={self.plugin_id: data})
+            if not result.available or not result.formatted:
+                logger.warning("Unable to render Home Assistant trigger page: %s", page_id)
+                return None
+            return result.formatted.split("\n")
+        except Exception:
+            logger.exception("Error rendering Home Assistant trigger page: %s", page_id)
+            return None
+
+    # ------------------------------------------------------------------
     # Lifecycle hooks
     # ------------------------------------------------------------------
 
     def on_config_change(self, old_config: Dict[str, Any], new_config: Dict[str, Any]) -> None:
         """Restart MQTT listener when statestream settings change."""
+        self._rule_values.clear()
         mqtt_keys = {
             "mqtt_statestream",
             "statestream_base_topic",
@@ -361,4 +507,3 @@ class HomeAssistantPlugin(PluginBase):
 
 # Export the plugin class
 Plugin = HomeAssistantPlugin
-
