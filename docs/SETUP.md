@@ -129,6 +129,41 @@ docker-compose restart
 docker-compose logs -f | grep -i "home\|assistant"
 ```
 
+## Optional: Priority Page Triggers
+
+FiestaBoard 7 or newer can temporarily display an existing template page when
+a Home Assistant entity state or attribute matches a rule. Each rule selects
+its own page and priority. Rules default to Ambient priority 10; explicitly use
+a value above 50 when the rule should override MLB Scores.
+
+For example, this rule replaces an active sports page with Now Playing while
+the media player reports `playing`:
+
+```json
+{
+  "id": "now_playing",
+  "name": "Now playing",
+  "entity_id": "media_player.home",
+  "page_id": "page-now-playing",
+  "field": "state",
+  "operator": "equals",
+  "value": "playing",
+  "priority": 60,
+  "duration_seconds": 45
+}
+```
+
+No Home Assistant page-changing automation is needed. While the media player
+is playing, the priority-60 rule overrides a live MLB page at priority 50.
+After playback stops and the trigger lease expires, FiestaBoard automatically
+returns to the still-active MLB game, or to its current schedule/manual page
+when no other trigger is active.
+
+The trigger page can use `home_assistant.trigger_name`,
+`home_assistant.trigger_actual`, `home_assistant.trigger_previous`, and all the
+normal Home Assistant entity variables. See the README for every comparison
+operator and trigger variable.
+
 ## Display Format
 
 ![Home Assistant Display](./board-display.png)
@@ -158,13 +193,10 @@ The system automatically maps states:
 
 ## Priority System
 
-Display priority order:
-
-1. **Guest WiFi** (highest) - When enabled
-2. **Home Assistant** - Can be set as active page
-3. **Weather + DateTime** - Can be set as active page
-
-You can select which page is active from the Pages UI.
+FiestaBoard compares every active plugin trigger numerically. Recommended tiers
+are Ambient 10, Notable 50, Urgent 80, and Critical 100. Home Assistant rules
+default to 10. Set Now Playing to 60 to place it above MLB Scores at 50, and
+reserve 80–100 for urgent household or safety events.
 
 ## Troubleshooting
 
@@ -298,4 +330,3 @@ Once configured:
 
 - [Home Assistant REST API](https://developers.home-assistant.io/docs/api/rest/)
 - [Home Assistant Long-lived Access Tokens](https://developers.home-assistant.io/docs/auth_api/#long-lived-access-tokens)
-
