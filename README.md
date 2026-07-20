@@ -82,20 +82,11 @@ When a page is rendered by a trigger, it also receives:
 Access ANY entity using its full entity_id:
 
 ```
-{{home_assistant.sensor.temperature.state}}
-{{home_assistant.binary_sensor.front_door.state}}
-{{home_assistant.light.living_room.state}}
-{{home_assistant.switch.fan.state}}
-{{home_assistant.climate.thermostat.state}}
-```
-
-### Configured Entities
-
-If you configure entities with display names:
-
-```
-{{home_assistant.entities.Temperature.state}}
-{{home_assistant.entities.Front Door.state}}
+{{home_assistant.sensor_temperature.state}}
+{{home_assistant.binary_sensor_front_door.state}}
+{{home_assistant.light_living_room.state}}
+{{home_assistant.switch_fan.state}}
+{{home_assistant.climate_thermostat.state}}
 ```
 
 ## Example Templates
@@ -104,29 +95,29 @@ If you configure entities with display names:
 
 ```
 {center}HOME STATUS
-Temp: {{home_assistant.sensor.temperature.state}}°
-Door: {{home_assistant.binary_sensor.front_door.state}}
-Lights: {{home_assistant.light.living_room.state}}
+Temp: {{home_assistant.sensor_temperature.state}}°
+Door: {{home_assistant.binary_sensor_front_door.state}}
+Lights: {{home_assistant.light_living_room.state}}
 ```
 
 ### Smart Home Dashboard
 
 ```
 {center}HOME
-Indoor: {{home_assistant.sensor.indoor_temp.state}}°
-Outdoor: {{home_assistant.sensor.outdoor_temp.state}}°
-Garage: {{home_assistant.cover.garage_door.state}}
-Alarm: {{home_assistant.alarm_control_panel.home.state}}
+Indoor: {{home_assistant.sensor_indoor_temp.state}}°
+Outdoor: {{home_assistant.sensor_outdoor_temp.state}}°
+Garage: {{home_assistant.cover_garage_door.state}}
+Alarm: {{home_assistant.alarm_control_panel_home.state}}
 ```
 
 ### Door/Window Status
 
 ```
 {center}SECURITY
-Front: {{home_assistant.binary_sensor.front_door.state}}
-Back: {{home_assistant.binary_sensor.back_door.state}}
-Garage: {{home_assistant.binary_sensor.garage.state}}
-Windows: {{home_assistant.binary_sensor.windows.state}}
+Front: {{home_assistant.binary_sensor_front_door.state}}
+Back: {{home_assistant.binary_sensor_back_door.state}}
+Garage: {{home_assistant.binary_sensor_garage.state}}
+Windows: {{home_assistant.binary_sensor_windows.state}}
 ```
 
 ## Configuration

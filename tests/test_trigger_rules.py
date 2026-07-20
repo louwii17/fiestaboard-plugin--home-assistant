@@ -1,7 +1,7 @@
 """Tests for generic Home Assistant page trigger rules."""
 
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from plugins.home_assistant import HomeAssistantPlugin
 from plugins.home_assistant.trigger_rules import MISSING, resolve_field, rule_matches
@@ -251,15 +251,30 @@ def test_selected_template_page_is_rendered_with_home_assistant_context():
     plugin = HomeAssistantPlugin(manifest())
     page = SimpleNamespace(type="template")
     rendered = SimpleNamespace(available=True, formatted="NOW PLAYING\nSONG TITLE")
-    page_service = SimpleNamespace(
-        get_page=lambda page_id: page if page_id == "page-now-playing" else None,
-        render_page=lambda selected_page, context: rendered,
-    )
+    page_service = MagicMock()
+    page_service.get_page.return_value = page
+    page_service.render_page.return_value = rendered
+    registry = MagicMock()
+    registry.build_template_context.return_value = {
+        "weather": {"temperature": "21"},
+        "home_assistant": {"stale": True},
+    }
+    trigger_data = {"trigger_name": "Now playing"}
 
-    with patch("src.pages.service.get_page_service", return_value=page_service):
-        lines = plugin._render_trigger_page("page-now-playing", {"trigger_name": "Now playing"})
+    with patch("src.pages.service.get_page_service", return_value=page_service), patch(
+        "src.plugins.get_plugin_registry", return_value=registry
+    ):
+        lines = plugin._render_trigger_page("page-now-playing", trigger_data)
 
     assert lines == ["NOW PLAYING", "SONG TITLE"]
+    page_service.get_page.assert_called_once_with("page-now-playing")
+    page_service.render_page.assert_called_once_with(
+        page,
+        context={
+            "weather": {"temperature": "21"},
+            "home_assistant": trigger_data,
+        },
+    )
 
 
 def test_rules_render_their_own_pages_and_keep_stable_ids_when_reordered():

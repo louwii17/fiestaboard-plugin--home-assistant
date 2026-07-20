@@ -464,13 +464,16 @@ class HomeAssistantPlugin(PluginBase):
             return None
         try:
             from src.pages.service import get_page_service
+            from src.plugins import get_plugin_registry
 
             page_service = get_page_service()
             page = page_service.get_page(page_id)
             if page is None or page.type != "template":
                 logger.warning("Home Assistant trigger page is missing or not a template: %s", page_id)
                 return None
-            result = page_service.render_page(page, context={self.plugin_id: data})
+            context = get_plugin_registry().build_template_context()
+            context[self.plugin_id] = data
+            result = page_service.render_page(page, context=context)
             if not result.available or not result.formatted:
                 logger.warning("Unable to render Home Assistant trigger page: %s", page_id)
                 return None
