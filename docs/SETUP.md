@@ -131,7 +131,7 @@ docker-compose logs -f | grep -i "home\|assistant"
 
 ## Optional: Priority Page Triggers
 
-FiestaBoard 7 or newer can temporarily display an existing template page when
+FiestaBoard 7 or newer can temporarily display an existing page when
 a Home Assistant entity state or attribute matches a rule. Each rule selects
 its own page and priority. Rules default to Ambient priority 10; explicitly use
 a value above 50 when the rule should override MLB Scores.

@@ -153,7 +153,7 @@ Configure specific entities with friendly names:
 ### Priority page triggers
 
 Add one or more rules. Each rule has its own stable ID, Home Assistant entity
-condition, FiestaBoard template page, priority, and trigger lease. Priorities
+condition, FiestaBoard page, priority, and trigger lease. Priorities
 are compared with every other active FiestaBoard plugin trigger; higher values
 win. Rules default to Ambient priority 10, so users must explicitly raise a
 rule that should interrupt notable content such as MLB Scores at priority 50.

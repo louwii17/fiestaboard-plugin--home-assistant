@@ -473,8 +473,8 @@ class HomeAssistantPlugin(PluginBase):
 
             page_service = get_page_service()
             page = page_service.get_page(page_id)
-            if page is None or page.type != "template":
-                logger.warning("Home Assistant trigger page is missing or not a template: %s", page_id)
+            if page is None:
+                logger.warning("Home Assistant trigger page is missing: %s", page_id)
                 return None
             context = get_plugin_registry().build_template_context()
             context[self.plugin_id] = data

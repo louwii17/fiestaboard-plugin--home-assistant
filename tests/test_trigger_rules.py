@@ -250,9 +250,9 @@ def test_render_failure_does_not_activate_empty_trigger():
         assert plugin.check_triggers() == []
 
 
-def test_selected_template_page_is_rendered_with_home_assistant_context():
+def test_selected_page_is_rendered_with_home_assistant_and_plugin_context():
     plugin = HomeAssistantPlugin(manifest())
-    page = SimpleNamespace(type="template")
+    page = SimpleNamespace(type="composite")
     rendered = SimpleNamespace(available=True, formatted="NOW PLAYING\nSONG TITLE")
     page_service = MagicMock()
     page_service.get_page.return_value = page
