@@ -78,6 +78,9 @@ class HomeAssistantPlugin(PluginBase):
         rule_id = str(rule.get("id") or "")
         if not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", rule_id):
             return [f"{prefix} requires a stable lowercase rule ID"]
+        group_id = str(rule.get("group_id") or "")
+        if group_id and not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", group_id):
+            return [f"{prefix} group ID must be a stable lowercase identifier"]
         if not rule.get("entity_id"):
             return [f"{prefix} requires an entity ID"]
         if rule.get("enabled", True) and not rule.get("page_id"):
@@ -406,6 +409,7 @@ class HomeAssistantPlugin(PluginBase):
             rule_key = str(rule.get("id") or "")
             if not rule_key:
                 continue
+            trigger_key = str(rule.get("group_id") or rule_key)
             entity = result.data.get(entity_id, MISSING)
             actual = resolve_field(entity, field)
             previous = self._rule_values.get(rule_key, MISSING)
@@ -425,6 +429,7 @@ class HomeAssistantPlugin(PluginBase):
                 {
                     "trigger_active": True,
                     "trigger_rule_id": rule_key,
+                    "trigger_group_id": trigger_key,
                     "trigger_name": str(rule.get("name") or entity_id),
                     "trigger_page_id": str(rule.get("page_id") or ""),
                     "trigger_priority": int(rule.get("priority", 10)),
@@ -443,7 +448,7 @@ class HomeAssistantPlugin(PluginBase):
             triggers.append(
                 TriggerResult(
                     triggered=True,
-                    trigger_id=f"home_assistant:{rule_key}",
+                    trigger_id=f"home_assistant:{trigger_key}",
                     priority=int(rule.get("priority", 10)),
                     duration_seconds=int(rule.get("duration_seconds", 45)),
                     data=trigger_data,

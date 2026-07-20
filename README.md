@@ -65,6 +65,7 @@ When a page is rendered by a trigger, it also receives:
 
 ```text
 {{home_assistant.trigger_rule_id}}
+{{home_assistant.trigger_group_id}}
 {{home_assistant.trigger_name}}
 {{home_assistant.trigger_page_id}}
 {{home_assistant.trigger_priority}}
@@ -199,6 +200,9 @@ name such as `temperature`, or a dot-separated path such as
 than FiestaBoard's page polling interval to prevent a persistent trigger from
 expiring between checks. Rule IDs must be unique and remain stable; reordering
 the rules does not change their trigger identity or dismissal behavior.
+Rules that represent mutually exclusive choices may share a `group_id`; the
+newly matching rule then replaces the previous trigger immediately instead of
+waiting for its lease to expire.
 
 ## Entity States
 

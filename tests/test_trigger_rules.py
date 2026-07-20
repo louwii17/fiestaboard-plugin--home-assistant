@@ -204,6 +204,9 @@ def test_validate_config_requires_stable_unique_rule_ids():
     errors = plugin.validate_config(config(duplicate, trigger_rules=[duplicate, dict(duplicate)]))
     assert "Trigger rule IDs must be unique: door_open" in errors
 
+    errors = plugin.validate_config(config(dict(base_rule, id="door_open", group_id="Manual Lock")))
+    assert "Trigger rule 1 group ID must be a stable lowercase identifier" in errors
+
 
 def test_mqtt_trigger_check_bypasses_plugin_result_cache():
     plugin = HomeAssistantPlugin(manifest())
@@ -308,3 +311,26 @@ def test_rules_render_their_own_pages_and_keep_stable_ids_when_reordered():
         ("home_assistant:urgent_door", 80, ["page-urgent", "urgent_door"]),
         ("home_assistant:ambient_door", 10, ["page-ambient", "ambient_door"]),
     ]
+
+
+def test_mutually_exclusive_rules_can_share_a_replacement_group():
+    plugin = HomeAssistantPlugin(manifest())
+    message = {
+        "id": "lock_message",
+        "group_id": "manual_lock",
+        "entity_id": "binary_sensor.front_door",
+        "page_id": "page-message",
+        "operator": "equals",
+        "value": "on",
+        "priority": 100,
+    }
+    plugin._config = config(message)
+
+    with patch.object(plugin, "get_data", return_value=data("on")), patch.object(
+        plugin, "_render_trigger_page", return_value=["LOCKED MESSAGE"]
+    ):
+        trigger = plugin.check_triggers()[0]
+
+    assert trigger.trigger_id == "home_assistant:manual_lock"
+    assert trigger.data["trigger_rule_id"] == "lock_message"
+    assert trigger.data["trigger_group_id"] == "manual_lock"
